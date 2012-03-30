@@ -27,4 +27,6 @@ class PrivatePerson(Person):
 
 
 nigel = PrivatePerson("Nigel", 35)
+assert nigel.name == "Nigel"
+assert nigel.age == 35
 

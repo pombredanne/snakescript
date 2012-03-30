@@ -3,6 +3,8 @@
 import ast
 import _ast
 import json
+import sys
+import os
 
 from flask import Flask, make_response, url_for
 app = Flask(__name__)
@@ -12,20 +14,7 @@ MODULE_TEMPLATE = """(function(self){{
 }})(window);"""
 
 CLASS_TEMPLATE = """\
-self.{name} = function {name}() {{
-    i = "__init__"
-    if (this == window) {{
-        // factory
-        I = new {name}()
-        if (I[i]) I[i].apply(I, arguments)
-        return I
-    }} else {{
-        // constructor
-        P = {name}.prototype
-        if (P[i]) P[i].apply(this, arguments)
-    }}
-}}
-{subclasses}
+$class("{name}", [{bases}]);
 {body}
 """
 
@@ -39,21 +28,18 @@ PRIVATE_FUNCTION_TEMPLATE = """\
 function {name}({args}) {{
 {body}
 }}
-
 """
 
 PUBLIC_FUNCTION_TEMPLATE = """\
-function {name}({args}) {{
+self.{name} = function({args}) {{
 {body}
 }}
-
 """
 
 FOR_TEMPLATE = """\
-try{{for(var ${target}=iter({iter}),{target}=next(${target});;{target}=next(${target})){{
+for (var ${target} = iter({iter}), {target} = next(${target}); {target} !== undefined; {target} = next(${target})){{
 {body}
-}}}}catch(e){{if(e!=StopIteration)throw e;}}
-"""
+}}"""
 
 BIN_OPS = {
 	_ast.Add      : "{0}+{1}",
@@ -79,41 +65,37 @@ CMP_OPS = {
 	_ast.GtE   : "{0}>={1}"
 }
 
+LIB = sys.path[0] + "/lib"
+
 def is_private(name):
 	return name.startswith("__") and not name.endswith("__")
 
-@app.route("/py")
-def py():
-	py = ""
-	py += open("lib/built-in.js").read()
-	py += open("lib/slice.js").read()
-	py += open("lib/tuple.js").read()
-	py += open("lib/dict.js").read()
-	py += open("lib/array.js").read()
-	py += open("lib/string.js").read()
-	py += open("modules/html.js").read()
-	return py
-
-@app.route("/test/<path:file_name>")
-def other(file_name):
-	return """\
-<html>
-<head>
-</head>
-<body>
-<script src="/py"></script>
-<script src="/scripts/test/{0}.py"></script>
-</body>
-</html>
-""".format(file_name)
-
-@app.route("/scripts/<path:file_name>")
-def py2js(file_name):
-	fin = file("scripts/{0}".format(file_name))
-	a = ast.parse(fin.read())
-	rs = make_response(js(a))
-	rs.headers["Content-Type"] = "application/json"
+@app.route("/<path:name>")
+def get_module(name):
+	rs = make_response(read_module(name))
+	rs.headers["Content-Type"] = "application/javascript"
 	return rs
+
+def read_module(name):
+	path = LIB + "/" + name
+	if os.path.isdir(path):
+		files = os.listdir(path)
+		out = ""
+		for f in files:
+			if f.endswith(".js"):
+				out += open(path + "/" + f).read()
+			elif f.endswith(".py"):
+				out += js(ast.parse(open(path + "/" + f).read()))
+			else:
+				pass
+		return out
+	else:
+		try:
+			f = open(path + ".js")
+			return f.read()
+		except:
+			f = open(path + ".py")
+			return js(ast.parse(f.read()))
 
 def js(a):
 	if a is None:
@@ -140,11 +122,11 @@ def js(a):
 			node.class_name = a.name
 		script = CLASS_TEMPLATE.format(
 			name=a.name,
-			subclasses="\n".join(["$extend({C},{B})\n".format(C=a.name, B=js(b)) for b in a.bases]),
+			bases=", ".join(map(js, a.bases)),
 			body="\n".join(map(js, a.body))
 		)
 	elif isinstance(a, _ast.Return):
-		script, args = "return {0}", [js(a.value)]
+		script = "return " + js(a.value)
 	elif isinstance(a, _ast.Assign):
 		if len(a.targets) == 1:
 			script, args = "{0}={1}", [
@@ -168,14 +150,19 @@ def js(a):
 		)
 	elif isinstance(a, _ast.Assert):
 		if a.msg:
-			script, args = "console.assert({0}, {1})", [
+			script, args = "$assert({0}, {1})", [
 				js(a.test),
 				js(a.msg)
 			]
 		else:
-			script, args = "console.assert({0})", [
+			script, args = "$assert({0})", [
 				js(a.test)
 			]
+	elif isinstance(a, _ast.Import):
+		# TODO - check imported only once
+		script = ""
+		for name in a.names:
+			script += read_module(js(name))
 	elif isinstance(a, _ast.Expr):
 		script = js(a.value)
 	elif isinstance(a, _ast.Pass):
@@ -232,7 +219,7 @@ def js(a):
 		]
 	elif isinstance(a, _ast.Subscript):
 		if isinstance(a.slice, _ast.Slice):
-			script = "{0}.__getitem__({1})"
+			script = "$getitem({0}, {1})"
 		else:
 			script = "{0}[{1}]"
 		args = [js(a.value), js(a.slice)]
@@ -259,6 +246,8 @@ def js(a):
 		script = js(a.value)
 	elif isinstance(a, _ast.arguments):
 		script = ",".join([js(x) for x in a.args])
+	elif isinstance(a, _ast.alias):
+		script = a.name
 	else:
 		raise NotImplementedError(a)
 	try:
