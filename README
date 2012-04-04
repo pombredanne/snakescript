@@ -1,0 +1,6 @@
+To run application
+> python app.py
+
+Example py to js conversion
+> http://localhost:5000/bigtest
+> test/bigtest.html
