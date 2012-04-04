@@ -284,10 +284,7 @@ def _stmt(a):
 		# TODO - check imported only once
 		script = ""
 		for name in a.names:
-			script += "\n".join([
-				open(f).read()
-				for f in get_module_files(_alias(name))
-			])
+			script += module(_alias(name)).to_javascript()
 	elif isinstance(a, _ast.Expr):
 		if isinstance(a.value, _ast.Str):
 			script = _comment(a.value.s)
