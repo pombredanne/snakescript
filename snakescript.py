@@ -183,7 +183,7 @@ def _stmt(a):
 			)
 		else:
 			script = "[{0}] = {1}".format(
-				", ".join([_expr(t) for t in a.targets]),
+				", ".join(map(_expr, a.targets)),
 				_expr(a.value)
 			)
 	elif isinstance(a, _ast.Print):
@@ -281,20 +281,13 @@ def _expr(a):
 				])
 			)
 	elif isinstance(a, _ast.Call):
-		script, args = "{0}({1})", [
-			_expr(a.func),
-			", ".join([_expr(x) for x in a.args])
-		]
+		script = "{0}({1})".format(_expr(a.func), ", ".join(map(_expr, a.args)))
 	elif isinstance(a, _ast.Num):
 		script = _object(a.n)
 	elif isinstance(a, _ast.Str):
 		script = _string(a.s)
 	elif isinstance(a, _ast.Attribute):
-		aname = a.attr
-		script, args = "{0}.{1}", [
-			_expr(a.value),
-			_identifier(aname)
-		]
+		script = "{0}.{1}".format(_expr(a.value), _identifier(a.attr))
 	elif isinstance(a, _ast.Subscript):
 		if isinstance(a.slice, _ast.Slice):
 			script = "$getitem({0}, {1})"
@@ -303,10 +296,10 @@ def _expr(a):
 		args = [_expr(a.value), _slice(a.slice)]
 	elif isinstance(a, _ast.Name):
 		script = _identifier(a.id)
-	elif isinstance(a, _ast.List) or isinstance(a, _ast.Tuple):
-		script, args = "[{0}]", [
-			", ".join([_expr(x) for x in a.elts])
-		]
+	elif isinstance(a, _ast.List):
+		script = "[{0}]".format(", ".join(map(_expr, a.elts)))
+	elif isinstance(a, _ast.Tuple):
+		script = "tuple([{0}])".format(", ".join(map(_expr, a.elts)))
 	else:
 		raise NotImplementedError(a)
 	try:
