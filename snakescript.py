@@ -98,7 +98,7 @@ class module(object):
 				js += _mod(ast.parse(src), self.name)
 			else:
 				raise TypeError
-		return js
+		return js + "\n"
 
 # takes block of code, indents once, rejoins and returns block
 indent = lambda body: "\n".join(["    " + line for line in body.splitlines()])
