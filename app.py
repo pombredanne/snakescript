@@ -23,24 +23,6 @@ $class(this, "{name}", [{bases}], function() {{
 
 }});"""
 
-METHOD_TEMPLATE = """\
-$def(this, "{name}", function({args}) {{
-{body}
-}});
-"""
-
-PRIVATE_FUNCTION_TEMPLATE = """\
-$def(this, "{name}", function({args}) {{
-{body}
-}});
-"""
-
-PUBLIC_FUNCTION_TEMPLATE = """\
-$def(this, "{name}", function({args}) {{
-{body}
-}});
-"""
-
 DEF_TEMPLATE = """\
 $def(this, "{name}", function({args}) {{
 {body}
@@ -52,59 +34,24 @@ for (var ${target} = iter({iter}), {target} = next(${target}); {target} !== unde
 {body}
 }}"""
 
-TRY_TEMPLATE = """\
-try {{
-{body}
-}}
-{handlers}"""
-
-EXCEPT_TEMPLATE = """\
-catch({type}) {{
-{body}
-}}"""
-
-TRY_FINALLY_TEMPLATE = """\
-try {{
-{body}
-}} finally {{
-{finalbody}
-}}"""
-
-IF_TEMPLATE = """\
-if ({test}) {{
-{body}
-}} else {{
-{orelse}
-}}"""
-
-IF_ELSE_TEMPLATE = """\
-if ({test}) {{
-{body}
-}}"""
-
-WHILE_TEMPLATE = """\
-while ({test}) {{
-{body}
-}}"""
-
 
 BIN_OPS = {
-	_ast.Add      : "{0} + {1}",
-	_ast.Sub      : "{0} - {1}",
-	_ast.Mult     : "{0} * {1}",
-	_ast.Div      : "{0} / {1}",
-	_ast.Mod      : "{0} % {1}",
+	_ast.Add      : "({0} + {1})",
+	_ast.Sub      : "({0} - {1})",
+	_ast.Mult     : "({0} * {1})",
+	_ast.Div      : "({0} / {1})",
+	_ast.Mod      : "({0} % {1})",
 	_ast.Pow      : "Math.pow({0}, {1})",
-	_ast.LShift   : "{0} << {1}",
-	_ast.RShift   : "{0} >> {1}",
-	_ast.BitOr    : "{0} | {1}",
-	_ast.BitXor   : "{0} ^ {1}",
-	_ast.BitAnd   : "{0} & {1}",
+	_ast.LShift   : "({0} << {1})",
+	_ast.RShift   : "({0} >> {1})",
+	_ast.BitOr    : "({0} | {1})",
+	_ast.BitXor   : "({0} ^ {1})",
+	_ast.BitAnd   : "({0} & {1})",
 	_ast.FloorDiv : "Math.floor({0}, {1})"
 }
 
 UNARY_OPS = {
-	_ast.Not    : "!({0})"
+	_ast.Not    : "(!({0}))"
 }
 
 CMP_OPS = {
@@ -238,15 +185,15 @@ def _stmt(a):
 			script = "return"
 	elif isinstance(a, _ast.Assign):
 		if len(a.targets) == 1:
-			script, args = "{0} = {1}", [
+			script = "{0} = {1}".format(
 				_expr(a.targets[0]),
 				_expr(a.value)
-			]
+			)
 		else:
-			script, args = "[{0}] = {1}", [
+			script = "[{0}] = {1}".format(
 				", ".join([_expr(t) for t in a.targets]),
 				_expr(a.value)
-			]
+			)
 	elif isinstance(a, _ast.Print):
 		script = "print({0})".format(", ".join(map(_expr, a.values)))
 	elif isinstance(a, _ast.For):
@@ -294,10 +241,7 @@ def _stmt(a):
 		script = ""
 	else:
 		raise NotImplementedError(a)
-	try:
-		return script.format(*args)
-	except NameError:
-		return script
+	return script
 
 def _expr(a):
 	if a is None:
@@ -311,7 +255,7 @@ def _expr(a):
 			raise NotImplementedError(a.op)
 	elif isinstance(a, _ast.BinOp):
 		try:
-			script, args = "(" + BIN_OPS[type(a.op)] + ")", [
+			script, args = BIN_OPS[type(a.op)], [
 				_expr(a.left),
 				_expr(a.right)
 			]
@@ -319,7 +263,7 @@ def _expr(a):
 			raise NotImplementedError(a.op)
 	elif isinstance(a, _ast.UnaryOp):
 		try:
-			script, args = "(" + UNARY_OPS[type(a.op)] + ")", [
+			script, args = UNARY_OPS[type(a.op)], [
 				_expr(a.operand)
 			]
 		except KeyError:

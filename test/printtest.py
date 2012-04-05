@@ -28,6 +28,6 @@ record = {
 x=html(record, "record")
 for i in range(2):
 	for j in range(3):
-		print(x)
-print(html([1,2,3,4,5]))
+		document.body.appendChild(x.cloneNode(True))
+document.body.appendChild(html([1,2,3,4,5]))
 
